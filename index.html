@@ -1,0 +1,1391 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DiBang</title>
+    <!-- iOS PWA 适配 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="DiBang">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- 本地离线库 -->
+    <script src="xlsx.full.min.js"></script>
+    <script src="vue.global.prod.js"></script>
+
+    <style>
+        /* ============================================================
+           设计系统变量 — iOS 27 "Liquid Glass" 视觉语言
+           大面积留白 / 柔和低饱和配色 / 统一圆角体系 / 细腻分层毛玻璃
+           ============================================================ */
+        :root {
+            /* 基础色板 */
+            --ios-bg: #F2F1F6;
+            --ios-bg-elevated: #FAFAFC;
+            --ios-card: #FFFFFF;
+            --ios-card-glass: rgba(255, 255, 255, 0.72);
+            --ios-blue: #0A84FF;
+            --ios-blue-strong: #0066E0;
+            --ios-gray-bg: #E4E4EA;
+            --ios-input-bg: #F2F2F7;
+            --ios-input-bg-active: #E9E9F0;
+            --ios-fill-tertiary: #EEEEF2;
+            --ios-text-primary: #1C1C1E;
+            --ios-text-secondary: #8A8A93;
+            --ios-text-tertiary: #C4C4CC;
+            --ios-border: rgba(60, 60, 67, 0.13);
+            --ios-border-strong: rgba(60, 60, 67, 0.22);
+            --ios-red: #FF3B30;
+            --ios-orange: #FF9F0A;
+            --ios-orange-tint: #FFF6EA;
+            --ios-green: #30D158;
+
+            /* 圆角体系 */
+            --r-xl: 24px;
+            --r-lg: 18px;
+            --r-md: 14px;
+            --r-sm: 10px;
+
+            /* 阴影体系 — 轻薄、多层、克制 */
+            --shadow-card: 0 1px 2px rgba(30,30,40,0.04), 0 12px 32px -12px rgba(30,30,40,0.10);
+            --shadow-float: 0 8px 28px -6px rgba(20,20,30,0.16);
+            --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.6);
+
+            /* 缓动曲线 — 类玻璃弹性回弹 */
+            --ease-spring: cubic-bezier(0.34, 1.4, 0.4, 1);
+            --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+            --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+        }
+
+        /* 深色模式自动适配（跟随系统，纯样式层，不影响任何逻辑） */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --ios-bg: #000000;
+                --ios-bg-elevated: #0C0C0E;
+                --ios-card: #1C1C1E;
+                --ios-card-glass: rgba(28, 28, 30, 0.72);
+                --ios-gray-bg: #2C2C2E;
+                --ios-input-bg: #26262A;
+                --ios-input-bg-active: #333338;
+                --ios-fill-tertiary: #2C2C2E;
+                --ios-text-primary: #F5F5F7;
+                --ios-text-secondary: #98989F;
+                --ios-text-tertiary: #5A5A60;
+                --ios-border: rgba(255, 255, 255, 0.09);
+                --ios-border-strong: rgba(255, 255, 255, 0.16);
+                --ios-orange-tint: rgba(255, 159, 10, 0.12);
+                --shadow-card: 0 1px 0 rgba(255,255,255,0.03), 0 16px 40px -16px rgba(0,0,0,0.6);
+                --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.04);
+            }
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
+        html { -webkit-text-size-adjust: 100%; }
+        body {
+            font-family: var(--font-family); background-color: var(--ios-bg);
+            background-image: radial-gradient(circle at 15% -10%, rgba(10,132,255,0.06), transparent 45%),
+                               radial-gradient(circle at 100% 0%, rgba(48,209,88,0.05), transparent 40%);
+            background-attachment: fixed;
+            margin: 0; padding: 0; color: var(--ios-text-primary);
+            -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+        }
+
+        #app {
+            max-width: 720px; margin: 0 auto;
+            padding: calc(env(safe-area-inset-top) + 20px) 16px calc(env(safe-area-inset-bottom) + 108px) 16px;
+            min-height: 100vh;
+        }
+
+        /* ---------- 卡片 ---------- */
+        .ios-card {
+            background: var(--ios-card-glass);
+            -webkit-backdrop-filter: blur(28px) saturate(160%);
+            backdrop-filter: blur(28px) saturate(160%);
+            border: 0.5px solid var(--ios-border);
+            border-radius: var(--r-xl); padding: 22px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-card), var(--shadow-inset);
+            transition: box-shadow 0.35s var(--ease-soft), transform 0.35s var(--ease-soft);
+        }
+
+        .ios-header {
+            font-size: 21px; font-weight: 700; letter-spacing: -0.4px;
+            margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;
+            gap: 12px;
+        }
+        .ios-header > span:first-child { flex-shrink: 0; }
+
+        .ios-badge {
+            background: rgba(10, 132, 255, 0.12); color: var(--ios-blue);
+            font-size: 12.5px; padding: 5px 13px; border-radius: 20px; font-weight: 600;
+            letter-spacing: -0.1px; white-space: nowrap;
+        }
+
+        .ios-group { margin-bottom: 16px; }
+        .ios-label {
+            font-size: 12.5px; font-weight: 600; color: var(--ios-text-secondary);
+            margin-bottom: 8px; display: block; text-transform: uppercase; letter-spacing: 0.4px;
+        }
+
+        /* ---------- 表单控件 ---------- */
+        input[type="file"], select, input[type="date"], input[type="text"], input[type="number"] {
+            width: 100%; padding: 14px 16px; border-radius: var(--r-md); border: 0.5px solid transparent;
+            background: var(--ios-input-bg); font-size: 16px; color: var(--ios-text-primary);
+            appearance: none; -webkit-appearance: none;
+            transition: background 0.2s var(--ease-soft), border-color 0.2s var(--ease-soft), box-shadow 0.2s var(--ease-soft);
+        }
+        input:focus, select:focus {
+            background: var(--ios-input-bg-active);
+            border-color: rgba(10, 132, 255, 0.45);
+            box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.12);
+        }
+
+        select {
+            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%228%22%20viewBox%3D%220%200%2014%208%22%3E%3Cpath%20fill%3D%22%238E8E93%22%20d%3D%22M7%208L0%201.333%201.4%200%207%205.333%2012.6%200%2014%201.333z%22%2F%3E%3C%2Fsvg%3E');
+            background-repeat: no-repeat; background-position: right 16px center; padding-right: 40px;
+            cursor: pointer;
+        }
+
+        input[type="file"] { font-size: 14px; color: var(--ios-text-secondary); padding: 10px 12px; }
+        input[type="file"]::file-selector-button {
+            border: none; background: var(--ios-blue); color: white; padding: 8px 14px;
+            border-radius: var(--r-sm); font-weight: 600; margin-right: 12px; cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        input[type="file"]::file-selector-button:active { opacity: 0.7; }
+
+        .ios-checkbox-wrapper { display: flex; flex-wrap: wrap; gap: 16px; font-size: 15px; margin-top: 8px; }
+        .ios-checkbox-wrapper label { display: flex; align-items: center; gap: 10px; color: var(--ios-text-primary); font-weight: 500; min-height: 24px; }
+        input[type="checkbox"] { width: 22px; height: 22px; margin: 0; accent-color: var(--ios-blue); cursor: pointer; flex-shrink: 0; }
+
+        hr { border: 0; border-top: 0.5px solid var(--ios-border); margin: 18px 0; }
+
+        /* ---------- 按钮 ---------- */
+        .ios-btn-group { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+        button {
+            border: none; padding: 16px; border-radius: var(--r-md); font-weight: 600; font-size: 17px;
+            cursor: pointer; transition: transform 0.28s var(--ease-spring), opacity 0.2s ease, box-shadow 0.28s var(--ease-soft);
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            min-height: 50px; letter-spacing: -0.2px; -webkit-tap-highlight-color: transparent;
+        }
+        button:active { transform: scale(0.965); opacity: 0.85; }
+        button:disabled { opacity: 0.38; cursor: not-allowed; transform: none; }
+        .btn-primary {
+            background: linear-gradient(180deg, var(--ios-blue) 0%, var(--ios-blue-strong) 100%);
+            color: white; width: 100%; box-shadow: 0 6px 16px -4px rgba(10, 132, 255, 0.4);
+        }
+        .btn-outline {
+            background: var(--ios-fill-tertiary); color: var(--ios-blue); width: 100%;
+            border: 0.5px solid var(--ios-border);
+        }
+        .btn-danger-sm {
+            background: rgba(255, 59, 48, 0.12); color: var(--ios-red); padding: 8px 14px; font-size: 13px;
+            border-radius: var(--r-sm); font-weight: 600; min-height: 34px;
+        }
+
+        /* ---------- 底部悬浮玻璃标签栏 ---------- */
+        .ios-tab-bar {
+            position: fixed; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 12px);
+            max-width: 696px; margin: 0 auto;
+            min-height: 62px;
+            background: var(--ios-card-glass);
+            -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%);
+            border: 0.5px solid var(--ios-border);
+            border-radius: 26px;
+            display: flex; justify-content: space-around; align-items: center;
+            z-index: 999; box-shadow: var(--shadow-float);
+        }
+        .ios-tab-item {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: var(--ios-text-secondary); font-size: 10.5px; font-weight: 600; cursor: pointer; flex: 1;
+            transition: color 0.25s var(--ease-soft); height: 62px; letter-spacing: 0.1px;
+            position: relative;
+        }
+        .ios-tab-item .icon {
+            font-size: 22px; margin-bottom: 3px; filter: grayscale(100%) opacity(0.55);
+            transition: all 0.3s var(--ease-spring); transform: scale(1);
+        }
+        .ios-tab-item.active { color: var(--ios-blue); }
+        .ios-tab-item.active .icon { filter: grayscale(0%) opacity(1); transform: scale(1.08) translateY(-1px); }
+
+        /* ---------- 分段控制器 ---------- */
+        .ios-segmented-control { display: flex; background: var(--ios-input-bg); padding: 3px; border-radius: 12px; margin-bottom: 12px; }
+        .ios-segment {
+            flex: 1; text-align: center; padding: 9px 4px; font-size: 13.5px; font-weight: 500;
+            border-radius: 9px; cursor: pointer; color: var(--ios-text-secondary);
+            transition: all 0.28s var(--ease-spring);
+        }
+        .ios-segment.active { background: var(--ios-card); color: var(--ios-text-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.10); font-weight: 600; }
+
+        /* ---------- 数据看板小组件 ---------- */
+        .widget-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 24px; }
+        .widget-card {
+            background: var(--ios-input-bg); border-radius: var(--r-lg); padding: 16px;
+            border: 0.5px solid var(--ios-border); transition: transform 0.25s var(--ease-spring);
+        }
+        .widget-title { font-size: 12.5px; font-weight: 600; color: var(--ios-text-secondary); margin-bottom: 8px; }
+        .widget-value { font-size: 21px; font-weight: 700; color: var(--ios-text-primary); letter-spacing: -0.5px; }
+
+        /* ---------- 数据表格 ---------- */
+        .table-container {
+            overflow-x: auto; max-height: 400px; border-radius: var(--r-md);
+            background: var(--ios-card); border: 0.5px solid var(--ios-border);
+            -webkit-overflow-scrolling: touch;
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 13.5px; text-align: left; }
+        th {
+            background: var(--ios-bg-elevated); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+            padding: 12px 16px; position: sticky; top: 0;
+            border-bottom: 0.5px solid var(--ios-border); font-weight: 600; color: var(--ios-text-secondary);
+            white-space: nowrap; z-index: 10;
+        }
+        td { padding: 11px 16px; border-bottom: 0.5px solid var(--ios-border); white-space: nowrap; }
+        tr:last-child td { border-bottom: none; }
+        tr { transition: background 0.15s ease; }
+        td input { padding: 8px 10px; font-size: 13.5px; border-radius: 8px; background: transparent; margin: -6px 0; transition: all 0.2s; }
+        td input:focus { background: var(--ios-input-bg); box-shadow: none; }
+
+        .table-container::-webkit-scrollbar { height: 6px; width: 6px; }
+        .table-container::-webkit-scrollbar-track { background: transparent; }
+        .table-container::-webkit-scrollbar-thumb { background: var(--ios-border-strong); border-radius: 4px; }
+
+        /* ---------- 汇报结果预览（终端风） ---------- */
+        .ios-report-preview {
+            width: 100%; min-height: 120px; background: #1D1E23; color: #C6CCD6;
+            padding: 20px; border-radius: var(--r-lg); font-family: "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 13.5px; line-height: 1.65; white-space: pre-wrap;
+            word-break: break-all; user-select: text; -webkit-user-select: text;
+            box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.06), inset 0 2px 10px rgba(0,0,0,0.25);
+        }
+
+        /* ---------- 折叠面板 ---------- */
+        details {
+            background: var(--ios-card); border: 0.5px solid var(--ios-border); border-radius: var(--r-md);
+            margin-bottom: 16px; overflow: hidden;
+        }
+        summary {
+            padding: 16px; font-size: 15.5px; font-weight: 600; color: var(--ios-text-primary);
+            cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+            background: var(--ios-card); list-style: none;
+        }
+        summary::-webkit-details-marker { display: none; }
+        details[open] summary { border-bottom: 0.5px solid var(--ios-border); }
+        .details-content { padding: 16px; background: var(--ios-input-bg); }
+
+        /* ---------- 移动端适配（安全区 / 触控热区 / 防溢出） ---------- */
+        @media (max-width: 480px) {
+            #app { padding-left: 12px; padding-right: 12px; }
+            .ios-card { padding: 18px; border-radius: var(--r-lg); }
+            .ios-header { font-size: 19px; }
+            .widget-grid { gap: 10px; }
+            .widget-card { padding: 14px; }
+            .widget-value { font-size: 19px; }
+            button { font-size: 16px; }
+            .ios-tab-bar { left: 8px; right: 8px; border-radius: 22px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- 📝 业务办理 -->
+        <div v-show="activeNavTab === 'business'">
+            <div class="ios-card">
+                <div class="ios-header">
+                    <span>DiBang Workspace</span>
+                    <span class="ios-badge">{{ mode === 'history' ? '自选历史提取' : '今日入账模式' }}</span>
+                </div>
+                <div class="ios-group">
+                    <span class="ios-label">1. 上传总账本 (.xlsx)</span>
+                    <input type="file" @change="onDbChange" accept=".xlsx">
+                </div>
+                <div class="ios-group">
+                    <span class="ios-label">2. 上传今日过磅单 (查历史免传)</span>
+                    <input type="file" @change="onDailyChange" accept=".xls,.xlsx,.csv">
+                </div>
+                <div v-if="ledgerLoaded" style="display:flex; gap:16px; margin-top: 20px;">
+                    <div class="ios-group" style="flex:1;">
+                        <span class="ios-label">选择日期</span>
+                        <input type="date" v-model="reportDate">
+                    </div>
+                    <div class="ios-group" style="flex:1;">
+                        <span class="ios-label">时间段</span>
+                        <select v-model="reportTime">
+                            <option value="0:00-18:00">0:00-18:00</option>
+                            <option value="18:00-24:00">18:00-24:00</option>
+                            <option value="0:00-24:00">0:00-24:00</option>
+                        </select>
+                    </div>
+                </div>
+                <button v-if="ledgerLoaded" class="btn-primary" @click="runPipeline" :disabled="pipelineRunning" style="margin-top: 12px;">
+                    {{ mode === 'history' ? '提取历史汇报' : '开启智能清洗与核算' }}
+                </button>
+            </div>
+
+            <!-- 动态五关拦截 UI -->
+            <div v-if="needsUserInput" class="ios-card" style="box-shadow: 0 0 0 1px rgba(255, 149, 0, 0.4), 0 4px 24px rgba(255, 149, 0, 0.08);">
+                <div class="ios-header" style="color: var(--ios-orange);">
+                    <span style="display:flex; align-items:center; gap:8px;"><span style="font-size:24px;">⚠️</span> 发现未知数据</span>
+                </div>
+
+                <!-- 1. 混合料 (天平 UI) -->
+                <div v-if="pending.mixed.length > 0">
+                    <span class="ios-label" style="color: var(--ios-orange);">1. 检测到混合料，请配置拆分比例</span>
+                    <div v-for="mat in pending.mixed" :key="mat" style="background: var(--ios-orange-tint); border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+                        <div style="font-weight: 600; margin-bottom: 8px;">📦 {{ mat }}</div>
+                        <div style="display:flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <div style="flex: 1; text-align: center;">
+                                <div style="font-size: 13px; color: var(--ios-text-secondary); margin-bottom: 4px;">{{ mat.split('+')[0].trim() }}</div>
+                                <div style="display:flex; align-items:center; justify-content:center;">
+                                    <input type="number" v-model.number="inputs.mixed[mat]" min="0" max="100" style="text-align:center; padding: 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.1);">
+                                    <span style="margin-left: 4px; font-weight: 600;">%</span>
+                                </div>
+                            </div>
+                            <div style="font-weight: 600; color: var(--ios-text-tertiary);">+</div>
+                            <div style="flex: 1; text-align: center;">
+                                <div style="font-size: 13px; color: var(--ios-text-secondary); margin-bottom: 4px;">{{ mat.split('+')[1] ? mat.split('+')[1].trim() : '其他' }}</div>
+                                <div style="background: var(--ios-fill-tertiary); border-radius: 10px; padding: 10px; font-weight: 600; color: var(--ios-text-secondary);">
+                                    {{ 100 - (inputs.mixed[mat] === undefined || inputs.mixed[mat] === null || inputs.mixed[mat] === '' ? 50 : inputs.mixed[mat]) }} %
+                                </div>
+                            </div>
+                        </div>
+                        <div style="font-size: 12px; color: var(--ios-text-secondary); background: var(--ios-card); padding: 8px; border-radius: 8px;">
+                            涉事单据：<br>
+                            <span v-for="h in getMixedHints(mat)" style="display:block; margin-top:2px;">🚛 {{h.trk}} | 单号:{{h.no}} | {{h.w}}吨</span>
+                        </div>
+                    </div>
+                    <hr>
+                </div>
+
+                <!-- 2. 未知物料 -->
+                <div v-if="pending.mats.length > 0">
+                    <span class="ios-label" style="color: var(--ios-orange);">2. 发现未知物料，请指定标准归类</span>
+                    <div v-for="mat in pending.mats" :key="mat" class="ios-group">
+                        <select v-model="inputs.mats[mat]">
+                            <option value="">-- 请归类: {{ mat }} --</option>
+                            <option value="(独立物料)">(独立物料)</option>
+                            <option value="(非销售/不计价)">(非销售/不计价)</option>
+                            <option v-for="opt in knownMatOptions" :key="opt" :value="opt">{{ opt }}</option>
+                        </select>
+                    </div>
+                    <hr>
+                </div>
+
+                <!-- 3. 未知客户 -->
+                <div v-if="pending.custs.length > 0">
+                    <span class="ios-label" style="color: var(--ios-orange);">3. 发现未知客户，请指定映射</span>
+                    <div v-for="cust in pending.custs" :key="cust" class="ios-group">
+                        <select v-model="inputs.custs[cust]">
+                            <option value="">-- 请映射: {{ cust }} --</option>
+                            <option value="(新建客户)">(新建客户)</option>
+                            <option v-for="opt in knownCustOptions" :key="opt" :value="opt">{{ opt }}</option>
+                        </select>
+                    </div>
+                    <hr>
+                </div>
+
+                <!-- 4. 缺失单价 -->
+                <div v-if="pending.prices.length > 0">
+                    <span class="ios-label" style="color: var(--ios-orange);">4. 缺失销售单价，请补填 (元/吨)</span>
+                    <div v-for="p in pending.prices" :key="p.key" class="ios-group">
+                        <span style="font-size: 14px; font-weight: 500; display: block; margin-bottom: 8px;">{{ p.cust }} - {{ p.mat }}</span>
+                        <input type="number" v-model.number="inputs.prices[p.key]" placeholder="输入销售单价">
+                    </div>
+                    <hr>
+                </div>
+
+                <!-- 5. 缺失加工费 -->
+                <div v-if="pending.fees.length > 0">
+                    <span class="ios-label" style="color: var(--ios-orange);">5. 未收录加工费规则，请补齐</span>
+                    <div v-for="f in pending.fees" :key="f.key" class="ios-group">
+                        <span style="font-size: 14px; font-weight: 500; display: block; margin-bottom: 8px;">{{ f.mat }} (销单价:{{ f.price }})</span>
+                        <input type="number" v-model.number="inputs.fees[f.key]" placeholder="输入加工费单价">
+                    </div>
+                </div>
+
+                <button class="btn-primary" @click="resumePipeline" style="background: var(--ios-orange); box-shadow: 0 4px 12px rgba(255,149,0,0.3); margin-top: 24px;">提交补填并继续</button>
+            </div>
+
+            <!-- 公司配送与运费 -->
+            <div v-if="deliveries.length > 0 && showFinanceDelivery" class="ios-card" style="box-shadow: 0 0 0 1px rgba(0, 122, 255, 0.2);">
+                <div class="ios-header" style="color: var(--ios-blue);">
+                    <span style="display:flex; align-items:center; gap:8px;"><span style="font-size:24px;">🚚</span> 配送单指定</span>
+                </div>
+                <div v-for="trk in deliveries" :key="trk.truck" style="margin-bottom: 16px; background: var(--ios-input-bg); padding: 16px; border-radius: 14px;">
+                    <div style="font-size: 15px; font-weight: 600; margin-bottom: 12px;">{{ trk.truck }} ({{ trk.count }}趟) - {{ trk.cust }}</div>
+                    <div style="display:flex; gap:12px; flex-wrap: wrap;">
+                        <select v-model="trk.driver" style="flex:1; min-width: 120px; background: var(--ios-card);">
+                            <option value="">-- 无司机 --</option>
+                            <option v-for="d in allDriverOptions" :key="d" :value="d">{{ d }}</option>
+                            <option value="__custom__">➕ 手动输入新司机…</option>
+                        </select>
+                        <input type="number" v-model.number="trk.price" placeholder="单价(元/吨)" style="flex:1; min-width: 100px; background: var(--ios-card);">
+                    </div>
+                    <input v-if="trk.driver === '__custom__'" type="text" v-model="trk.customDriverName" placeholder="请输入新司机姓名" style="background: var(--ios-card); margin-top: 8px;">
+                </div>
+            </div>
+
+            <!-- 财务资金登记 (折叠面板) -->
+            <div v-if="showFinanceDelivery">
+                <div class="ios-group" style="background: var(--ios-card); border-radius: 16px; border: 1px solid var(--ios-border); margin-bottom: 16px; overflow: hidden;">
+                    <div @click="showFinancePanel = !showFinancePanel" style="padding: 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: var(--ios-card);">
+                        <span style="display:flex; align-items:center; gap:8px; font-size:16px; font-weight:600;"><span style="font-size:20px;">💰</span> 财务预存/资金登记</span>
+                        <span style="font-size: 14px; font-weight: 500; color: var(--ios-blue);">{{ showFinancePanel ? '收起 ⌃' : '展开登记 ⌄' }}</span>
+                    </div>
+                    
+                    <div v-show="showFinancePanel" style="padding: 0 16px 16px 16px; background: var(--ios-input-bg); border-top: 1px solid var(--ios-border);">
+                        <div style="margin-top: 16px;">
+                            <div v-for="(f, idx) in finances" :key="idx" style="margin-bottom: 16px; background: var(--ios-card); padding: 16px; border-radius: 14px; border: 1px solid var(--ios-border);">
+                                <div style="display:flex; gap:12px; margin-bottom: 12px;">
+                                    <select v-model="f.cust" style="flex:1; background: var(--ios-input-bg);"><option value="">(不录入)</option><option v-for="opt in allCustOptions" :key="opt" :value="opt">{{ opt }}</option></select>
+                                    <select v-model="f.type" style="flex:1; background: var(--ios-input-bg);"><option>微信</option><option>现金</option><option>预存微信</option><option>预存现金</option><option>预存银行卡</option></select>
+                                </div>
+                                <div style="display:flex; gap:12px; align-items: center;">
+                                    <input type="number" v-model.number="f.amount" placeholder="金额(元)" style="flex:1; background: var(--ios-input-bg);">
+                                    <button class="btn-danger-sm" @click="finances.splice(idx, 1)" style="width: auto; padding: 14px 16px; border-radius: 10px;">移除</button>
+                                </div>
+                            </div>
+                            <button class="btn-outline" @click="finances.push({cust:'', type:'微信', amount:0})" style="background: var(--ios-card);">➕ 新增一笔收款</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ios-group" style="background: var(--ios-card); padding: 20px; border-radius: 16px; border: 1px solid var(--ios-border); margin-bottom: 16px;">
+                    <span class="ios-label">附加总运费 (元)</span>
+                    <input type="number" v-model.number="extraFreight" placeholder="如有今日产生的额外总运费请填写">
+                </div>
+
+                <button class="btn-primary" @click="finalizeDailyReport">⚡ 生成最终核算报告</button>
+            </div>
+
+            <!-- 结果 -->
+            <div class="ios-card" v-if="reportOutput">
+                <div class="ios-header"><span>汇报结果</span></div>
+                <div class="ios-report-preview">{{ reportOutput }}</div>
+                <div class="ios-btn-group">
+                    <button class="btn-primary" @click="copyReport">手动复制文本</button>
+                    <button class="btn-outline" @click="exportNewLedger">下载更新总账本 (.xlsx)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE 2: 📊 经营看板 -->
+        <div v-show="activeNavTab === 'dashboard'">
+            <div class="ios-card" v-if="ledgerLoaded">
+                <div class="ios-header"><span>{{ currentMonthStr }}月 经营看板</span></div>
+                <div class="widget-grid">
+                    <div class="widget-card">
+                        <div class="widget-title">本月销售总额</div>
+                        <div class="widget-value" style="color:var(--ios-blue);">¥ {{ monthlyMetrics.totalSales.toFixed(2) }}</div>
+                    </div>
+                    <div class="widget-card">
+                        <div class="widget-title">本月加工费总额</div>
+                        <div class="widget-value" style="color:var(--ios-green);">¥ {{ monthlyMetrics.totalFee.toFixed(2) }}</div>
+                    </div>
+                    <div class="widget-card">
+                        <div class="widget-title">本月出货总量</div>
+                        <div class="widget-value">{{ monthlyMetrics.totalWeight.toFixed(2) }} <span style="font-size:14px;font-weight:600;color:var(--ios-text-secondary);">吨</span></div>
+                    </div>
+                    <div class="widget-card">
+                        <div class="widget-title">单价规格组合</div>
+                        <div class="widget-value">{{ monthlyMetrics.matCount }} <span style="font-size:14px;font-weight:600;color:var(--ios-text-secondary);">项</span></div>
+                    </div>
+                </div>
+                <span class="ios-label" style="margin-bottom:12px;">各石料不同单价明细</span>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>石料名称</th><th>单价</th><th>销量(吨)</th><th>金额</th></tr></thead>
+                        <tbody>
+                            <tr v-for="(item, idx) in monthlyMetrics.matDetails" :key="idx">
+                                <td><strong style="font-weight:600;">{{ item.name }}</strong></td>
+                                <td>¥{{ item.price.toFixed(2) }}</td>
+                                <td>{{ item.weight.toFixed(2) }}</td>
+                                <td>¥{{ item.amount.toFixed(2) }}</td>
+                            </tr>
+                            <tr v-if="monthlyMetrics.matDetails.length === 0"><td colspan="4" style="text-align:center; padding:24px; color:var(--ios-text-secondary);">当月暂无销售数据</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="ios-card" v-else style="text-align:center; padding:60px 20px; color:var(--ios-text-secondary); font-weight: 500;">
+                <div style="font-size: 32px; margin-bottom: 12px; filter: grayscale(1);">📂</div>
+                请先在业务上传总账本
+            </div>
+        </div>
+
+        <!-- PAGE 3: 🛠️ 账本管理 -->
+        <div v-show="activeNavTab === 'ledger'">
+            <div class="ios-card" v-if="ledgerLoaded">
+                <div class="ios-header"><span>修改总账本基础数据</span></div>
+                <div class="ios-segmented-control" style="flex-wrap: wrap; height: auto;">
+                    <div class="ios-segment" :class="{active: activeTab==='bal'}" @click="activeTab='bal'">余额</div>
+                    <div class="ios-segment" :class="{active: activeTab==='hist'}" @click="activeTab='hist'">明细</div>
+                    <div class="ios-segment" :class="{active: activeTab==='rules'}" @click="activeTab='rules'">加工费</div>
+                    <div class="ios-segment" :class="{active: activeTab==='map'}" @click="activeTab='map'">物料映射</div>
+                    <div class="ios-segment" :class="{active: activeTab==='cmap'}" @click="activeTab='cmap'">客户映射</div>
+                </div>
+
+                <div v-if="activeTab==='bal'">
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th>客户名称</th><th>余额 (元)</th><th>操作</th></tr></thead>
+                            <tbody>
+                                <tr v-for="(row, idx) in balData" :key="idx">
+                                    <td><input type="text" v-model="row['客户名称']"></td>
+                                    <td><input type="number" v-model.number="row['余额']"></td>
+                                    <td><button class="btn-danger-sm" @click="confirmDelete(balData, idx, '客户余额')">删除</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <button class="btn-outline" style="margin-top:16px;" @click="balData.push({'客户名称':'新客户','余额':0})">添加新客户</button>
+                </div>
+
+                <div v-if="activeTab==='hist'">
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th>单号</th><th>重车时间</th><th>收货单位</th><th>货物名称</th><th>净重</th><th>金额</th><th>操作</th></tr></thead>
+                            <tbody>
+                                <tr v-for="(row, idx) in histData" :key="idx">
+                                    <td><input type="text" v-model="row['单号']" style="width:80px;"></td>
+                                    <td><input type="text" v-model="row['重车时间']" style="width:110px;"></td>
+                                    <td><input type="text" v-model="row['收货单位']" style="width:100px;"></td>
+                                    <td><input type="text" v-model="row['货物名称']" style="width:100px;"></td>
+                                    <td><input type="number" v-model.number="row['净重']" style="width:70px;"></td>
+                                    <td><input type="number" v-model.number="row['金额']" style="width:80px;"></td>
+                                    <td><button class="btn-danger-sm" @click="confirmDelete(histData, idx, '过磅明细')">删除</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <button class="btn-outline" style="margin-top:16px;" @click="addHistRow">添加历史行</button>
+                </div>
+
+                <div v-if="activeTab==='rules'">
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th>物料名称</th><th>销售单价</th><th>加工费单价</th><th>操作</th></tr></thead>
+                            <tbody>
+                                <tr v-for="(row, idx) in rulesData" :key="idx">
+                                    <td><input type="text" v-model="row['物料名称']"></td>
+                                    <td><input type="number" v-model.number="row['销售单价']"></td>
+                                    <td><input type="number" v-model.number="row['加工费单价']"></td>
+                                    <td><button class="btn-danger-sm" @click="confirmDelete(rulesData, idx, '加工费规则')">删除</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <button class="btn-outline" style="margin-top:16px;" @click="rulesData.push({'物料名称':'','销售单价':0,'加工费单价':0})">添加规则</button>
+                </div>
+
+                <div v-if="activeTab==='map'">
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th>原始名称</th><th>标准归类</th><th>操作</th></tr></thead>
+                            <tbody>
+                                <tr v-for="(row, idx) in mappingData" :key="idx">
+                                    <td><input type="text" v-model="row['原始名称']"></td>
+                                    <td><input type="text" v-model="row['标准名称']"></td>
+                                    <td><button class="btn-danger-sm" @click="confirmDelete(mappingData, idx, '物料映射')">删除</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <button class="btn-outline" style="margin-top:16px;" @click="mappingData.push({'原始名称':'','标准名称':''})">添加物料映射</button>
+                </div>
+
+                <div v-if="activeTab==='cmap'">
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th>原始名称</th><th>客户标准名称</th><th>操作</th></tr></thead>
+                            <tbody>
+                                <tr v-for="(row, idx) in custMappingData" :key="idx">
+                                    <td><input type="text" v-model="row['原始名称']"></td>
+                                    <td><input type="text" v-model="row['标准名称']"></td>
+                                    <td><button class="btn-danger-sm" @click="confirmDelete(custMappingData, idx, '客户映射')">删除</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <button class="btn-outline" style="margin-top:16px;" @click="custMappingData.push({'原始名称':'','标准名称':''})">添加客户映射</button>
+                </div>
+            </div>
+            <div class="ios-card" v-else style="text-align:center; padding:60px 20px; color:var(--ios-text-secondary); font-weight: 500;">
+                <div style="font-size: 32px; margin-bottom: 12px; filter: grayscale(1);">📂</div>
+                请先在业务上传总账本
+            </div>
+        </div>
+
+        <!-- PAGE 4: ⚙️ 设置 -->
+        <div v-show="activeNavTab === 'settings'">
+            <div class="ios-card">
+                <div class="ios-header"><span>系统设置</span></div>
+                
+                <div class="ios-group">
+                    <span class="ios-label">汇报排版模板</span>
+                    <div class="ios-segmented-control">
+                        <div class="ios-segment" :class="{active: reportVersion==='v1'}" @click="reportVersion='v1'">v1 标准版</div>
+                        <div class="ios-segment" :class="{active: reportVersion==='v2'}" @click="reportVersion='v2'">v2 公式明细版</div>
+                    </div>
+                    <p style="font-size:13px; color:var(--ios-text-secondary); margin-top: 8px; line-height: 1.4;">公式明细版会展示 净重×单价=金额 过程，以及包含配送运费的合并展示。</p>
+                </div>
+
+                <hr>
+
+                <div class="ios-group">
+                    <span class="ios-label">金额取整设置 (四舍五入)</span>
+                    <div style="background: var(--ios-input-bg); border-radius: 14px; padding: 16px;">
+                        <div class="ios-checkbox-wrapper" style="flex-direction: column; gap:16px; margin-top: 0;">
+                            <label><input type="checkbox" v-model="roundSettings.retail"> 零售单(微信/现金) 自动取整</label>
+                            <label><input type="checkbox" v-model="roundSettings.sign"> 签单客户账单 自动取整</label>
+                            <label><input type="checkbox" v-model="roundSettings.fee"> 加工费 自动取整</label>
+                            <label><input type="checkbox" v-model="roundSettings.freight"> 公司配送运费 自动取整</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部导航 -->
+        <div class="ios-tab-bar">
+            <div class="ios-tab-item" :class="{active: activeNavTab==='business'}" @click="activeNavTab='business'"><div class="icon">📝</div><span>业务</span></div>
+            <div class="ios-tab-item" :class="{active: activeNavTab==='dashboard'}" @click="activeNavTab='dashboard'"><div class="icon">📊</div><span>看板</span></div>
+            <div class="ios-tab-item" :class="{active: activeNavTab==='ledger'}" @click="activeNavTab='ledger'"><div class="icon">🛠️</div><span>账本</span></div>
+            <div class="ios-tab-item" :class="{active: activeNavTab==='settings'}" @click="activeNavTab='settings'"><div class="icon">⚙️</div><span>设置</span></div>
+        </div>
+
+    </div>
+
+    <!-- 严格保持原封不动的业务逻辑脚本 -->
+    <script>
+        if ('serviceWorker' in navigator) { navigator.serviceWorker.register('./sw.js'); }
+
+        // 重量去零优化
+        function fmtExact(v) {
+            if (v === null || v === undefined || isNaN(v)) return '0';
+            let res = parseFloat(v).toFixed(2);
+            return res.replace(/\.?0+$/, '').replace(/\.$/, '');
+        }
+
+        // UTC 无损时间解析 (修复跨天时区 Bug)
+        function parseExcelDate(val) {
+            if (!val) return '';
+            if (typeof val === 'number' || (!isNaN(val) && !isNaN(parseFloat(val)))) {
+                let n = parseFloat(val);
+                if (n > 30000) {
+                    let d = new Date(Math.round((n - 25569) * 86400 * 1000));
+                    let yyyy = d.getUTCFullYear();
+                    let mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                    let dd = String(d.getUTCDate()).padStart(2, '0');
+                    let hh = String(d.getUTCHours()).padStart(2, '0');
+                    let mi = String(d.getUTCMinutes()).padStart(2, '0');
+                    return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+                }
+            }
+            return String(val).trim();
+        }
+
+        Vue.createApp({
+            data() {
+                return {
+                    activeNavTab: 'business', dbFile: null, dailyFile: null, ledgerLoaded: false,
+                    mode: 'history', activeTab: 'bal', reportVersion: 'v1', extraFreight: 0,
+                    roundSettings: { retail: true, sign: false, fee: false, freight: false },
+                    
+                    // 🌟 统一数据池状态，拒绝割裂
+                    balData: [], histData: [], rulesData: [], mappingData: [], custMappingData: [], freightData: [], incomeData: [],
+                    origBalData: [], origHistData: [], origFreightData: [], origIncomeData: [],
+                    dailyMerged: false,
+                    
+                    reportDate: new Date().toISOString().slice(0, 10), reportTime: '0:00-18:00', reportOutput: '',
+                    rawDailyRows: [], pipelineRunning: false, needsUserInput: false, showFinanceDelivery: false,
+                    showFinancePanel: false, 
+                    pending: { mixed: [], mats: [], custs: [], prices: [], fees: [] },
+                    inputs: { mixed: {}, mats: {}, custs: {}, prices: {}, fees: {} },
+                    deliveries: [], finances: [{cust:'', type:'微信', amount:0}]
+                }
+            },
+            computed: {
+                currentMonthStr() { return this.reportDate ? this.reportDate.slice(0, 7) : ''; },
+                knownMatOptions() {
+                    let s = new Set();
+                    this.rulesData.forEach(r => { if(r['物料名称']) s.add(String(r['物料名称']).trim()); });
+                    return Array.from(s).sort();
+                },
+                knownCustOptions() {
+                    let s = new Set();
+                    this.balData.forEach(b => { if(b['客户名称']) s.add(String(b['客户名称']).trim()); });
+                    this.histData.forEach(h => { if(h['收货单位']) s.add(String(h['收货单位']).trim()); });
+                    return Array.from(s).filter(x => x !== '内部单' && x !== '零售客户' && x !== '未知客户').sort();
+                },
+                allCustOptions() {
+                    let s = new Set(this.knownCustOptions);
+                    this.rawDailyRows.forEach(r => {
+                        let c = String(r['收货单位'] || '').trim();
+                        if(c) s.add(c);
+                    });
+                    return Array.from(s).sort();
+                },
+                allDriverOptions() {
+                    let s = new Set();
+                    this.freightData.forEach(f => { if (f['司机姓名']) s.add(String(f['司机姓名']).trim()); });
+                    this.deliveries.forEach(d => { if (d.driver && d.driver !== '__custom__') s.add(d.driver); });
+                    return Array.from(s).sort();
+                },
+                monthlyMetrics() {
+                    if (!this.histData || !this.histData.length) return { totalSales: 0, totalFee: 0, totalWeight: 0, matCount: 0, matDetails: [] };
+                    const prefix = this.currentMonthStr;
+                    let totalSales = 0, totalFee = 0, totalWeight = 0;
+                    const matMap = {};
+                    this.histData.forEach(r => {
+                        const tStr = parseExcelDate(r['重车时间']);
+                        if (!tStr || !tStr.startsWith(prefix)) return;
+                        const gbType = String(r['过磅类型'] || '').trim();
+                        const stdCat = String(r['标准归类'] || '').trim();
+                        if (gbType === '' || stdCat === '(非销售/不计价)') return;
+                        const weight = parseFloat(r['净重']) || 0;
+                        const price = parseFloat(r['单价']) || 0;
+                        const amount = parseFloat(r['金额']) || 0;
+                        const fee = parseFloat(r['加工费']) || 0;
+                        const matName = String(r['汇报专用名称'] || r['货物名称'] || '未归类石料').trim();
+                        totalSales += amount; totalFee += fee; totalWeight += weight;
+                        const key = `${matName}_${price}`;
+                        if (!matMap[key]) matMap[key] = { name: matName, price: price, weight: 0, amount: 0, fee: 0 };
+                        matMap[key].weight += weight; matMap[key].amount += amount; matMap[key].fee += fee;
+                    });
+                    const matDetails = Object.values(matMap).sort((a, b) => b.amount - a.amount);
+                    return { totalSales, totalFee, totalWeight, matCount: matDetails.length, matDetails };
+                }
+            },
+            methods: {
+                doRound(val, category) {
+                    if (val === null || val === undefined || isNaN(val)) return 0;
+                    let v = parseFloat(val);
+                    return this.roundSettings[category] ? Math.round(v) : (Math.round(v * 100) / 100);
+                },
+                fmtVal(v, category = 'none') {
+                    if (v === null || v === undefined || isNaN(v)) return '0';
+                    let val = parseFloat(v);
+                    if (this.roundSettings[category]) return Math.round(val).toString();
+                    return val.toFixed(2).replace(/\.?0+$/, '').replace(/\.$/, '');
+                },
+                confirmDelete(arr, idx, label) {
+                    if (window.confirm(`确定要删除【${label}】吗？操作无法撤销。`)) {
+                        arr.splice(idx, 1);
+                    }
+                },
+                async onDbChange(e) {
+                    this.dbFile = e.target.files[0];
+                    if (!this.dbFile) return;
+                    e.target.value = ''; // 🌟 允许重复上传同名文件
+                    
+                    try {
+                        const buf = await this.dbFile.arrayBuffer();
+                        const wb = XLSX.read(buf, { type: 'array' });
+                        const readSheet = (name) => wb.SheetNames.includes(name) ? XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: '' }) : [];
+                        
+                        this.balData = readSheet('客户余额'); this.histData = readSheet('过磅明细');
+                        this.rulesData = readSheet('加工费规则'); this.mappingData = readSheet('物料归类映射');
+                        this.custMappingData = readSheet('客户归类映射'); this.freightData = readSheet('公司配送-运费');
+                        this.incomeData = readSheet('财务收入明细');
+
+                        let maxDate = '';
+                        this.histData.forEach(row => {
+                            let tStr = parseExcelDate(row['重车时间']);
+                            row['重车时间'] = tStr;
+                            if (tStr && tStr.length >= 10) {
+                                let dStr = tStr.slice(0, 10);
+                                if (dStr > maxDate) maxDate = dStr;
+                            }
+                        });
+                        if (maxDate) { this.reportDate = maxDate; this.reportTime = '0:00-24:00'; }
+                        
+                        this.origBalData = JSON.parse(JSON.stringify(this.balData));
+                        this.origHistData = JSON.parse(JSON.stringify(this.histData));
+                        this.origFreightData = JSON.parse(JSON.stringify(this.freightData));
+                        this.origIncomeData = JSON.parse(JSON.stringify(this.incomeData));
+
+                        this.dailyMerged = false;
+                        this.ledgerLoaded = true; this.checkMode();
+                    } catch(err) {
+                        alert('总账本文件读取失败，请确认文件未损坏且为.xlsx格式。');
+                        this.dbFile = null;
+                    }
+                },
+                onDailyChange(e) { 
+                    this.dailyFile = e.target.files[0]; 
+                    e.target.value = ''; 
+                    this.checkMode(); 
+                },
+                checkMode() { this.mode = (this.dbFile && this.dailyFile) ? 'daily' : 'history'; },
+                addHistRow() {
+                    const todayStr = new Date().toISOString().slice(0, 10);
+                    this.histData.push({ '单号': String(Date.now()).slice(-6), '重车时间': todayStr + ' 10:00', '收货单位': '新客户', '货物名称': '普通料', '净重': 0, '单价': 0, '金额': 0, '过磅类型': '签单', '加工费': 0 });
+                },
+                async runPipeline() {
+                    if (this.mode === 'history') { this.extractHistoryReport(); return; }
+                    
+                    if (this.dailyMerged) {
+                        if (!confirm("重新生成将覆盖您在此前进行的任何手工编辑，确定继续吗？")) return;
+                        this.balData = JSON.parse(JSON.stringify(this.origBalData));
+                        this.histData = JSON.parse(JSON.stringify(this.origHistData));
+                        this.freightData = JSON.parse(JSON.stringify(this.origFreightData));
+                        this.incomeData = JSON.parse(JSON.stringify(this.origIncomeData));
+                        this.dailyMerged = false;
+                    }
+
+                    this.pipelineRunning = true;
+                    try {
+                        const buf = await this.dailyFile.arrayBuffer();
+                        const dailyWb = XLSX.read(buf, { type: 'array' });
+                        this.rawDailyRows = XLSX.utils.sheet_to_json(dailyWb.Sheets[dailyWb.SheetNames[0]], { defval: '' });
+                        this.analyzeDailyData();
+                    } catch(err) {
+                        alert('每日过磅单读取失败。');
+                        this.pipelineRunning = false;
+                    }
+                },
+                
+                getMixedHints(matName) {
+                    let hints = [];
+                    this.rawDailyRows.forEach(r => {
+                        if (String(r['货物名称'] || '').trim() === matName && !String(r['过磅类型'] || '').includes('作废')) {
+                            let originalNo = String(r['单号']).trim();
+                            let cleanNo = originalNo.endsWith('.0') ? originalNo.slice(0, -2) : originalNo;
+                            hints.push({ trk: String(r['车号']), no: cleanNo, w: parseFloat(r['净重']||0) });
+                        }
+                    });
+                    return hints;
+                },
+
+                analyzeDailyData() {
+                    this.pending = { mixed: [], mats: [], custs: [], prices: [], fees: [] };
+                    let origMats = new Set(); this.mappingData.forEach(m => {if(m['原始名称']) origMats.add(String(m['原始名称']).trim());});
+                    let stdMats = new Set(); this.rulesData.forEach(r => {if(r['物料名称']) stdMats.add(String(r['物料名称']).trim());});
+                    let origCusts = new Set(); this.custMappingData.forEach(c => {if(c['原始名称']) origCusts.add(String(c['原始名称']).trim());});
+                    let stdCusts = new Set(this.knownCustOptions);
+                    stdCusts.add('内部单'); stdCusts.add('零售客户'); stdCusts.add('未知客户');
+                    let memDriver = {}; let memPrice = {};
+                    this.freightData.forEach(r => {
+                        if (r['车号'] && r['司机姓名']) memDriver[String(r['车号']).trim()] = String(r['司机姓名']).trim();
+                        if (r['收货单位'] && parseFloat(r['运费单价'])>0) memPrice[String(r['收货单位']).trim()] = parseFloat(r['运费单价']);
+                    });
+                    let deliveryMap = {};
+
+                    this.rawDailyRows.forEach(r => {
+                        let gbType = String(r['过磅类型'] || '').trim();
+                        if (gbType.includes('作废') || gbType.includes('生产')) return;
+                        let rawMat = String(r['货物名称'] || '').trim();
+                        let rk = String(r['备注'] || '').trim();
+                        
+                        if (rawMat.includes('+') && this.inputs.mixed[rawMat] === undefined) {
+                            if (!this.pending.mixed.includes(rawMat)) {
+                                this.pending.mixed.push(rawMat);
+                                this.inputs.mixed[rawMat] = 50; 
+                            }
+                            return; 
+                        }
+                        let matsToCheck = rawMat.includes('+') ? [rawMat.split('+')[0].trim(), (rawMat.split('+')[1]||'其他').trim()] : [rawMat];
+                        let isNonSales = (!gbType || rk.includes('自用') || rk.includes('办公楼'));
+                        matsToCheck.forEach(m => {
+                            let stdM = m;
+                            this.mappingData.forEach(mp => { if(String(mp['原始名称']).trim() === m) stdM = String(mp['标准名称']).trim(); });
+                            if (!origMats.has(m) && !stdMats.has(m) && !this.inputs.mats[m]) {
+                                if (!this.pending.mats.includes(m)) this.pending.mats.push(m);
+                            }
+                            if (!isNonSales && this.inputs.mats[m] !== '(非销售/不计价)') {
+                                let w = parseFloat(r['净重'])||0; let p = parseFloat(r['单价'])||0; let a = parseFloat(r['金额'])||0;
+                                if (p === 0 && a === 0) {
+                                    let c = String(r['收货单位'] || '零售客户').trim();
+                                    let pk = `${c}_${stdM}`;
+                                    if (this.inputs.prices[pk] === undefined) {
+                                        if (!this.pending.prices.find(x=>x.key===pk)) this.pending.prices.push({key:pk, cust:c, mat:stdM});
+                                    }
+                                }
+                                let effectiveP = (p===0 && a===0) ? (this.inputs.prices[`${String(r['收货单位'] || '零售客户').trim()}_${stdM}`]||0) : p;
+                                if (effectiveP > 0) {
+                                    let hasRule = false;
+                                    this.rulesData.forEach(rule => {
+                                        if (String(rule['物料名称']).trim() === stdM && parseFloat(rule['销售单价']) === effectiveP) hasRule = true;
+                                    });
+                                    let fk = `${stdM}_${effectiveP}`;
+                                    if (!hasRule && this.inputs.fees[fk] === undefined) {
+                                        if (!this.pending.fees.find(x=>x.key===fk)) this.pending.fees.push({key:fk, mat:stdM, price:effectiveP});
+                                    }
+                                }
+                            }
+                        });
+                        let rawCust = String(r['收货单位'] || '').trim();
+                        if (!rawCust) {
+                            rawCust = (gbType.includes('微信') || gbType.includes('现金')) ? '零售客户' : (!gbType ? '内部单' : '未知客户');
+                        }
+                        let custResolved = rawCust;
+                        this.custMappingData.forEach(cp => { if(String(cp['原始名称']).trim() === rawCust) custResolved = String(cp['标准名称']).trim(); });
+                        if (!origCusts.has(rawCust) && !stdCusts.has(rawCust) && !this.inputs.custs[rawCust]) {
+                            if (!this.pending.custs.includes(rawCust)) this.pending.custs.push(rawCust);
+                        }
+                        if (rk.includes('公司配送')) {
+                            let trk = String(r['车号']).trim();
+                            if (!deliveryMap[trk]) deliveryMap[trk] = { truck: trk, count: 0, cust: custResolved, driver: memDriver[trk]||'', customDriverName: '', price: memPrice[custResolved]||0 };
+                            deliveryMap[trk].count++;
+                        }
+                    });
+                    this.deliveries = Object.values(deliveryMap);
+                    let hasPending = this.pending.mixed.length || this.pending.mats.length || this.pending.custs.length || this.pending.prices.length || this.pending.fees.length;
+                    if (hasPending) {
+                        this.needsUserInput = true; this.showFinanceDelivery = false;
+                    } else {
+                        this.needsUserInput = false; this.showFinanceDelivery = true;
+                    }
+                },
+
+                resumePipeline() {
+                    const unfilledMats = this.pending.mats.filter(m => !this.inputs.mats[m]);
+                    const unfilledCusts = this.pending.custs.filter(c => !this.inputs.custs[c]);
+                    const unfilledPrices = this.pending.prices.filter(p => this.inputs.prices[p.key] === undefined || this.inputs.prices[p.key] === '');
+                    const unfilledFees = this.pending.fees.filter(f => this.inputs.fees[f.key] === undefined || this.inputs.fees[f.key] === '');
+                    if (unfilledMats.length || unfilledCusts.length || unfilledPrices.length || unfilledFees.length) {
+                        alert('还有未填写完整的项目，请检查卡片内所有选项后再提交。');
+                        return;
+                    }
+
+                    for (let [m, s] of Object.entries(this.inputs.mats)) {
+                        if (s && s !== '(独立物料)') this.mappingData.push({'原始名称': m, '标准名称': s});
+                    }
+                    for (let [c, s] of Object.entries(this.inputs.custs)) {
+                        if (s && s !== '(新建客户)') this.custMappingData.push({'原始名称': c, '标准名称': s});
+                    }
+                    for (let [fk, fee] of Object.entries(this.inputs.fees)) {
+                        let parts = fk.split('_');
+                        this.rulesData.push({'物料名称': parts[0], '销售单价': parseFloat(parts[1]), '加工费单价': fee});
+                    }
+                    this.analyzeDailyData();
+                },
+
+                finalizeDailyReport() {
+                    const feeRulesMap = {};
+                    this.rulesData.forEach(r => { feeRulesMap[`${String(r['物料名称']).trim()}_${parseFloat(r['销售单价']) || 0}`] = parseFloat(r['加工费单价']) || 0; });
+                    const matMapDict = {};
+                    this.mappingData.forEach(m => { if (m['原始名称'] && m['标准名称']) matMapDict[String(m['原始名称']).trim()] = String(m['标准名称']).trim(); });
+                    const custMapDict = {};
+                    this.custMappingData.forEach(c => { if (c['原始名称'] && c['标准名称']) custMapDict[String(c['原始名称']).trim()] = String(c['标准名称']).trim(); });
+                    const deliveryDict = {};
+                    this.deliveries.forEach(d => { deliveryDict[d.truck] = d; });
+
+                    const sales = [], nonSales = [], newHistRows = [], newFreightRows = [];
+                    let freightTotal = 0;
+
+                    this.rawDailyRows.forEach(r => {
+                        let gbType = String(r['过磅类型'] || '').trim();
+                        if (gbType.includes('作废') || gbType.includes('生产')) return;
+                        
+                        let rk = String(r['备注'] || '').trim();
+                        let rawMat = String(r['货物名称'] || '未归类石料').trim();
+                        let originalNo = String(r['单号'] || '').trim();
+                        let billNo = originalNo.endsWith('.0') ? originalNo.slice(0, -2) : originalNo;
+                        let timeStr = parseExcelDate(r['重车时间']) || `${this.reportDate} 10:00`;
+                        let trk = String(r['车号']).trim();
+                        
+                        const rowCat = (gbType.includes('微信') || gbType.includes('现金')) ? 'retail' : (gbType.includes('签单') ? 'sign' : 'none');
+                        
+                        let rowsToProcess = [];
+                        if (rawMat.includes('+')) {
+                            let rawPct = this.inputs.mixed[rawMat];
+                            let pct1 = (rawPct === undefined || rawPct === null || rawPct === '') ? 50 : parseFloat(rawPct);
+                            pct1 = Math.max(0, Math.min(100, isNaN(pct1) ? 50 : pct1));
+
+                            let parts = rawMat.split('+');
+                            let m1 = parts[0].trim(), m2 = parts[1] ? parts[1].trim() : '其他';
+                            let wOrig = parseFloat(r['净重'])||0, pOrig = parseFloat(r['单价'])||0, aOrig = parseFloat(r['金额'])||0;
+                            let r1 = {...r}, r2 = {...r};
+                            let w1 = Math.round(wOrig * (pct1/100) * 1000)/1000;
+                            let w2 = wOrig - w1;
+                            r1['净重'] = w1; r2['净重'] = w2;
+                            r1['货物名称'] = m1; r2['货物名称'] = m2;
+                            r1['汇报专用名称'] = rawMat; r2['汇报专用名称'] = rawMat;
+                            if (pOrig===0 && aOrig===0) {
+                                r1['金额']=0; r2['金额']=0; r1._pre=true; r2._pre=true;
+                            } else {
+                                let trueT = pOrig>0 ? wOrig*pOrig : aOrig;
+                                let exact1 = pOrig>0 ? w1*pOrig : trueT*(pct1/100);
+                                
+                                // 🌟 修复双边同时独立取整凭空多出钱的 BUG：整体取整，减去第一半，确保完全吻合。
+                                const roundedTotal = this.doRound(trueT, rowCat);
+                                const rounded1 = this.doRound(exact1, rowCat);
+                                const rounded2 = roundedTotal - rounded1;
+
+                                r1['单价'] = pOrig; r2['单价'] = pOrig;
+                                r1['金额'] = rounded1; r2['金额'] = rounded2; 
+                                r1._pre=true; r2._pre=true;
+                            }
+                            rowsToProcess.push(r1, r2);
+                        } else {
+                            r['汇报专用名称'] = rawMat;
+                            rowsToProcess.push(r);
+                        }
+
+                        rowsToProcess.forEach(rr => {
+                            let rm = rr['货物名称'];
+                            let stdMat = matMapDict[rm] || rm;
+                            if (this.inputs.mats[rm] === '(独立物料)') stdMat = rm;
+                            else if (this.inputs.mats[rm]) stdMat = this.inputs.mats[rm];
+                            let rc = String(rr['收货单位'] || '').trim();
+                            if (!rc) rc = (gbType.includes('微信') || gbType.includes('现金')) ? '零售客户' : (!gbType ? '内部单' : '未知客户');
+                            let stdCust = custMapDict[rc] || rc;
+                            if (this.inputs.custs[rc] === '(新建客户)') stdCust = rc;
+
+                            let w = parseFloat(rr['净重'])||0; let p = parseFloat(rr['单价'])||0; let a = parseFloat(rr['金额'])||0;
+                            if (p===0 && a===0) p = this.inputs.prices[`${stdCust}_${stdMat}`] || 0;
+                            
+                            if (!rr._pre) {
+                                a = (p>0) ? this.doRound(w*p, rowCat) : this.doRound(a, rowCat);
+                            } else {
+                                a = rr['金额']; // 拆分过的已完全处理，不再二次 doRound
+                            }
+                            
+                            let feeUnit = feeRulesMap[`${stdMat}_${p}`] || 0;
+                            let feeAmt = this.doRound(w * feeUnit, 'fee');
+                            let isNonSales = (!gbType || rk.includes('自用') || rk.includes('办公楼') || stdMat === '(非销售/不计价)');
+                            
+                            let freightPrice = 0;
+                            if (!isNonSales && rk.includes('公司配送') && deliveryDict[trk]) {
+                                freightPrice = deliveryDict[trk].price || 0;
+                                let fAmt = this.doRound(w * freightPrice, 'freight');
+                                freightTotal += fAmt;
+                                rk = `${rk} [运费${freightPrice}]`;
+                                
+                                const resolvedDriver = deliveryDict[trk].driver === '__custom__' ? String(deliveryDict[trk].customDriverName || '').trim() : (deliveryDict[trk].driver || '');
+                                newFreightRows.push({
+                                    '单号': billNo, '重车时间': timeStr, '车号': trk,
+                                    '收货单位': stdCust, '货物名称': stdMat, '净重': w,
+                                    '司机姓名': resolvedDriver,
+                                    '运费单价': freightPrice, '运费金额': fAmt
+                                });
+                            }
+                            const finalRow = {
+                                '单号': billNo, '重车时间': timeStr, '车号': trk,
+                                '货物名称': rm, '标准归类': stdMat, '汇报专用名称': rr['汇报专用名称'],
+                                '净重': w, '单价': p, '金额': a, '收货单位': stdCust,
+                                '过磅类型': gbType, '备注': rk, '加工费单价': feeUnit, '加工费': feeAmt
+                            };
+                            if (isNonSales) nonSales.push(finalRow); else sales.push(finalRow);
+                            newHistRows.push(finalRow);
+                        });
+                    });
+
+                    // 🌟 完全合并入原账本数据
+                    this.histData = [...this.histData, ...newHistRows];
+                    this.freightData = [...this.freightData, ...newFreightRows];
+
+                    const balDict = {};
+                    this.balData.forEach(b => { balDict[String(b['客户名称']).trim()] = parseFloat(b['余额']) || 0; });
+                    
+                    sales.filter(s => String(s['过磅类型']).includes('签单')).forEach(s => {
+                        const cust = String(s['收货单位']).trim();
+                        balDict[cust] = (balDict[cust] !== undefined) ? balDict[cust] - s['金额'] : -s['金额'];
+                    });
+                    
+                    const newIncomeRows = [];
+                    this.finances.forEach(f => {
+                        if (f.cust && f.amount > 0 && f.cust !== '(不录入)') {
+                            if (f.cust !== '零售客户') balDict[f.cust] = (balDict[f.cust] || 0) + f.amount;
+                            newIncomeRows.push({
+                                '日期': this.reportDate, '客户名称': f.cust, '收入类型': f.type, '金额': f.amount, '备注': '预存/结算登记'
+                            });
+                        }
+                    });
+                    this.incomeData = [...this.incomeData, ...newIncomeRows];
+
+                    this.balData = Object.entries(balDict).map(([k, v]) => ({ '客户名称': k, '余额': Math.round(v * 100) / 100 }));
+                    
+                    this.dailyMerged = true;
+                    this.reportOutput = this.buildStrictReportText(sales, nonSales, freightTotal, false);
+                    this.pipelineRunning = false;
+                },
+
+                // 🌟 返回 { text, roundedTotal }，确保渲染的文本总和严格等于返回的总计值，告别“多层取整造成的1分钱差异”
+                renderProductLines(rows, category) {
+                    let out = '';
+                    let roundedTotal = 0;
+
+                    if (this.reportVersion === 'v1') {
+                        const pGroup = {};
+                        rows.forEach(r => {
+                            const p = String(r['汇报专用名称'] || r['货物名称']).trim();
+                            if (!pGroup[p]) pGroup[p] = { count: 0, weight: 0, money: 0 };
+                            pGroup[p].count += 1;
+                            pGroup[p].weight += (parseFloat(r['净重']) || 0);
+                            pGroup[p].money += (parseFloat(r['金额']) || 0);
+                        });
+                        for (let [prod, g] of Object.entries(pGroup)) {
+                            let rMoney = this.doRound(g.money, category);
+                            roundedTotal += rMoney;
+                            out += `${prod}:${g.count}车${fmtExact(g.weight)}吨${this.fmtVal(rMoney, 'none')} 元\n`;
+                        }
+                    } else {
+                        const pGroup = {};
+                        rows.forEach(r => {
+                            const p = String(r['汇报专用名称'] || r['货物名称']).trim();
+                            const price = parseFloat(r['单价']) || 0;
+                            const rk = String(r['备注'] || '');
+                            const isDelivery = rk.includes('公司配送');
+                            
+                            let freightPrice = 0;
+                            const matchF = rk.match(/\[运费(\d+(\.\d+)?)\]/);
+                            if (matchF) freightPrice = parseFloat(matchF[1]);
+                            
+                            const key = `${p}_${price}_${isDelivery}_${freightPrice}`;
+                            if (!pGroup[key]) pGroup[key] = { prod: p, price, isDelivery, freightPrice, count: 0, weight: 0, money: 0 };
+                            pGroup[key].count += 1; 
+                            pGroup[key].weight += (parseFloat(r['净重']) || 0); 
+                            pGroup[key].money += (parseFloat(r['金额']) || 0);
+                        });
+
+                        for (let g of Object.values(pGroup)) {
+                            const wStr = fmtExact(g.weight);
+                            const rMoney = this.doRound(g.money, category);
+                            roundedTotal += rMoney;
+                            const mStr = this.fmtVal(rMoney, 'none');
+                            
+                            if (g.isDelivery && g.freightPrice > 0) {
+                                out += `${g.prod}:${g.count}车${wStr}吨×${fmtExact(g.price)}元(含${fmtExact(g.freightPrice)}元运费)=${mStr} 元\n`;
+                            } else if (g.price > 0) {
+                                out += `${g.prod}:${g.count}车${wStr}吨×${fmtExact(g.price)}元=${mStr} 元\n`;
+                            } else {
+                                out += `${g.prod}:${g.count}车${wStr}吨${mStr} 元\n`;
+                            }
+                        }
+                    }
+                    return { text: out, roundedTotal };
+                },
+
+                buildStrictReportText(salesRows, nonSalesRows = [], inlineFreightTotal = 0, isHistory = false) {
+                    const dayLabel = (this.reportTime === '18:00-24:00') ? '当晚' : '当日';
+                    const dParts = this.reportDate.split('-');
+                    const dateHeader = `${dParts[0].slice(-2)}年${dParts[1]}月${dParts[2]}日`;
+                    let text = `${dateHeader} ${this.reportTime}\n`;
+
+                    const dfCash = salesRows.filter(r => String(r['过磅类型']).includes('现金'));
+                    const dfWx   = salesRows.filter(r => String(r['过磅类型']).includes('微信'));
+                    const dfSign = salesRows.filter(r => String(r['过磅类型']).includes('签单'));
+
+                    // 1. 现金
+                    let cashAmt = 0;
+                    if (dfCash.length === 0) text += '\n现金:无\n';
+                    else {
+                        const totalW = dfCash.reduce((a, b) => a + (parseFloat(b['净重']) || 0), 0);
+                        let cashRes = this.renderProductLines(dfCash, 'retail');
+                        cashAmt = cashRes.roundedTotal;
+                        text += `\n现金:${dfCash.length}车${fmtExact(totalW)}吨${this.fmtVal(cashAmt, 'none')}元\n`;
+                        text += cashRes.text;
+                    }
+
+                    // 2. 微信
+                    let wxAmt = 0;
+                    if (dfWx.length === 0) text += '\n微信:无\n';
+                    else {
+                        const totalW = dfWx.reduce((a, b) => a + (parseFloat(b['净重']) || 0), 0);
+                        let wxRes = this.renderProductLines(dfWx, 'retail');
+                        wxAmt = wxRes.roundedTotal;
+                        text += `\n微信:${dfWx.length}车${fmtExact(totalW)}吨${this.fmtVal(wxAmt, 'none')}元\n`;
+                        text += wxRes.text;
+                    }
+
+                    // 3. 签单
+                    let signGrandTotal = 0;
+                    if (dfSign.length === 0) text += '\n签单:无\n\n';
+                    else {
+                        const totalW = dfSign.reduce((a, b) => a + (parseFloat(b['净重']) || 0), 0);
+                        text += `\n签单:${dfSign.length}车${fmtExact(totalW)}吨\n`;
+                        
+                        const custGroup = {};
+                        dfSign.forEach(r => {
+                            const c = String(r['收货单位'] || '未知客户').trim();
+                            if (!custGroup[c]) custGroup[c] = [];
+                            custGroup[c].push(r);
+                        });
+                        
+                        const origBalDict = {};
+                        this.origBalData.forEach(b => origBalDict[String(b['客户名称']).trim()] = parseFloat(b['余额']) || 0);
+
+                        for (let [cust, rows] of Object.entries(custGroup)) {
+                            const cWeight = rows.reduce((a, b) => a + (parseFloat(b['净重']) || 0), 0);
+                            
+                            let signRes = this.renderProductLines(rows, 'sign');
+                            let cMoney = signRes.roundedTotal;
+                            signGrandTotal += cMoney;
+
+                            text += `${cust}:${rows.length}车${fmtExact(cWeight)}吨\n`;
+                            text += signRes.text;
+                            
+                            const originalBal = origBalDict[cust] || 0;
+                            
+                            // 🌟 修复历史查账时提取财务登记记录
+                            let depositAmt = 0;
+                            if (isHistory) {
+                                this.incomeData.forEach(f => { 
+                                    if(String(f['客户名称']).trim() === cust && f['日期'] === this.reportDate) {
+                                        depositAmt += (parseFloat(f['金额']) || 0);
+                                    }
+                                });
+                            } else {
+                                this.finances.forEach(f => { if(f.cust === cust) depositAmt += f.amount; });
+                            }
+                            
+                            let startBal = isHistory ? (originalBal + cMoney - depositAmt) : originalBal;
+                            let finalBal = isHistory ? originalBal : (originalBal - cMoney + depositAmt);
+                            
+                            text += `共金额:${this.fmtVal(cMoney, 'none')} 元\n`;
+                            text += `上日余额:${this.fmtVal(startBal, 'none')} 元\n`;
+                            if (depositAmt > 0) text += `今日充值:${this.fmtVal(depositAmt, 'none')} 元\n`;
+                            text += `当日余额:${this.fmtVal(finalBal, 'none')} 元\n\n`;
+                        }
+                    }
+
+                    // 未销售部分
+                    if (nonSalesRows.length > 0) {
+                        text += `----过磅----\n`;
+                        const remarkGroup = {};
+                        nonSalesRows.forEach(r => {
+                            let rk = String(r['备注'] || '内部自用').trim();
+                            if (!rk) rk = '内部自用';
+                            if (!remarkGroup[rk]) remarkGroup[rk] = [];
+                            remarkGroup[rk].push(r);
+                        });
+                        for (let [rk, rkRows] of Object.entries(remarkGroup)) {
+                            text += `${rk}:\n`;
+                            const matGrp = {};
+                            rkRows.forEach(r => {
+                                // 🌟 修复非销售材料强制使用原始货物名称
+                                const mName = String(r['货物名称'] || '未指定石料').trim();
+                                if (!matGrp[mName]) matGrp[mName] = { count: 0, weight: 0 };
+                                matGrp[mName].count += 1;
+                                matGrp[mName].weight += (parseFloat(r['净重']) || 0);
+                            });
+                            for (let [mName, g] of Object.entries(matGrp)) {
+                                text += `${mName}:${g.count}车${fmtExact(g.weight)}吨\n`;
+                            }
+                        }
+                        text += `-------------\n\n`;
+                    }
+
+                    // 🌟 修复历史运费为 0 的 Bug：从明细行的备注里原样拔取，确保所见即所得
+                    let parsedFreightTotal = 0;
+                    salesRows.forEach(r => {
+                        let matchF = String(r['备注']).match(/\[运费(\d+(\.\d+)?)\]/);
+                        if (matchF) {
+                            let w = parseFloat(r['净重']) || 0;
+                            parsedFreightTotal += this.doRound(w * parseFloat(matchF[1]), 'freight');
+                        }
+                    });
+                    const finalFreightTotal = parsedFreightTotal + (parseFloat(this.extraFreight) || 0);
+
+                    // 4. 底部大一统汇总
+                    const salesCars = salesRows.length;
+                    const totalSalesW = salesRows.reduce((a, b) => a + (parseFloat(b['净重']) || 0), 0);
+                    const totalSalesM = cashAmt + wxAmt + signGrandTotal; // 🌟 严丝合缝
+                    const unsoldCarsCount = nonSalesRows.length;
+                    const unsoldStr = unsoldCarsCount > 0 ? ` (含未销售/废料/自用等 ${unsoldCarsCount} 车)` : '';
+                    
+                    text += `1,${dayLabel}销售共计:${salesCars} 车${fmtExact(totalSalesW)} 吨 ${this.fmtVal(totalSalesM, 'none')} 元,公司配送运费:${this.fmtVal(finalFreightTotal, 'none')}元 ,合计:${this.fmtVal(totalSalesM + finalFreightTotal, 'none')} 元。${unsoldStr}\n`;
+
+                    const selMonth = parseInt(dParts[1], 10);
+                    const selDay = parseInt(dParts[2], 10);
+                    
+                    const dailyFee = salesRows.reduce((a, b) => a + (parseFloat(b['加工费']) || 0), 0);
+                    let monthlyFee = 0;
+                    const monthPrefix = `${dParts[0]}-${dParts[1]}`;
+                    
+                    // 🌟 核心修复历史加工费重复计算：直接且仅从当前 histData 库累加（里面已包含今日记录）
+                    this.histData.forEach(h => {
+                        const hTime = parseExcelDate(h['重车时间']);
+                        if (hTime.startsWith(monthPrefix) && hTime.slice(0, 10) <= this.reportDate) {
+                            monthlyFee += (parseFloat(h['加工费']) || 0);
+                        }
+                    });
+
+                    text += `2,${dayLabel}加工费:${this.fmtVal(dailyFee, 'fee')} 元,${selMonth}月1日-${selDay}日加工费合计:${this.fmtVal(monthlyFee, 'fee')} 元。\n`;
+
+                    // 🌟 财务收款记录合并
+                    const collParts = [];
+                    if (wxAmt > 0) collParts.push(`微信零售:${this.fmtVal(wxAmt, 'none')}元`);
+                    if (cashAmt > 0) collParts.push(`现金零售:${this.fmtVal(cashAmt, 'none')}元`);
+                    
+                    let extraIncomes = 0;
+                    if (isHistory) {
+                        this.incomeData.forEach(f => {
+                            if (f['日期'] === this.reportDate && parseFloat(f['金额']) > 0) {
+                                let cName = String(f['客户名称']).trim();
+                                let cType = String(f['收入类型']).trim();
+                                let amt = parseFloat(f['金额']);
+                                if (cName === '零售客户' && cType.includes('零售')) return; 
+                                let label = (cName === '(不录入)' || cName === '') ? cType : `${cName}${cType}`;
+                                collParts.push(`${label}:${this.fmtVal(amt, 'none')}元`);
+                                extraIncomes += amt;
+                            }
+                        });
+                    } else {
+                        this.finances.forEach(f => {
+                            if(f.amount > 0) {
+                                let label = (f.cust === '零售客户' || f.cust === '(不录入)' || f.cust === '') ? f.type : `${f.cust}${f.type}`;
+                                collParts.push(`${label}:${this.fmtVal(f.amount, 'none')}元`);
+                                extraIncomes += f.amount;
+                            }
+                        });
+                    }
+
+                    const totalColl = wxAmt + cashAmt + extraIncomes;
+                    const collStr = collParts.length > 0 ? collParts.join(',') : '0元';
+                    text += `3,${dayLabel}合计收款:${collStr},共计:${this.fmtVal(totalColl, 'none')} 元\n`;
+
+                    return text;
+                },
+
+                extractHistoryReport() {
+                    const selDateStr = this.reportDate;
+                    const targetHist = this.origHistData.filter(r => {
+                        const tStr = parseExcelDate(r['重车时间']);
+                        if (!tStr.startsWith(selDateStr)) return false;
+                        const hour = parseInt(tStr.split(' ')[1] || '0', 10);
+                        if (this.reportTime === '0:00-18:00') return hour < 18;
+                        if (this.reportTime === '18:00-24:00') return hour >= 18;
+                        return true;
+                    });
+                    
+                    const sales = targetHist.filter(r => String(r['过磅类型']).trim() !== '' && String(r['标准归类']) !== '(非销售/不计价)');
+                    const nonSales = targetHist.filter(r => String(r['过磅类型']).trim() === '' || String(r['标准归类']) === '(非销售/不计价)');
+                    
+                    this.reportOutput = this.buildStrictReportText(sales, nonSales, 0, true);
+                },
+
+                copyReport(event) { 
+                    navigator.clipboard.writeText(this.reportOutput); 
+                    let btn = event.target;
+                    let oldText = btn.innerText;
+                    btn.innerText = "✅ 已复制到剪贴板！";
+                    btn.style.backgroundColor = "var(--ios-green)";
+                    setTimeout(() => { btn.innerText = oldText; btn.style.backgroundColor = "var(--ios-blue)"; }, 2000);
+                },
+
+                exportNewLedger() {
+                    const newWb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(newWb, XLSX.utils.json_to_sheet(this.balData), '客户余额');
+                    XLSX.utils.book_append_sheet(newWb, XLSX.utils.json_to_sheet(this.rulesData), '加工费规则');
+                    XLSX.utils.book_append_sheet(newWb, XLSX.utils.json_to_sheet(this.mappingData), '物料归类映射');
+                    XLSX.utils.book_append_sheet(newWb, XLSX.utils.json_to_sheet(this.custMappingData), '客户归类映射');
+                    XLSX.utils.book_append_sheet(newWb, XLSX.utils.json_to_sheet(this.histData), '过磅明细');
+                    XLSX.utils.book_append_sheet(newWb, XLSX.utils.json_to_sheet(this.freightData), '公司配送-运费');
+                    XLSX.utils.book_append_sheet(newWb, XLSX.utils.json_to_sheet(this.incomeData), '财务收入明细');
+                    
+                    const dateStr = this.reportDate.replace(/-/g, '');
+                    const safeTime = this.reportTime.replace(/:/g, '_');
+                    const fileName = `${dateStr}_${safeTime}_DiBang总账本.xlsx`;
+                    XLSX.writeFile(newWb, fileName);
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
