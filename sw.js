@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dibang-offline-v14'; // 每次更新必须改大版本号 (如 v5, v6)
+const CACHE_NAME = 'dibang-offline-v15'; // 每次更新必须改大版本号 (如 v5, v6)
 
 // 必须缓存的核心文件
 const REQUIRED_FILES = [
