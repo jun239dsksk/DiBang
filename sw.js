@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dibang-offline-v36';
+const CACHE_NAME = 'dibang-offline-v37';
 const urlsToCache = [
   './',
   './index.html',
