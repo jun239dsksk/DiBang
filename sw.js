@@ -3,7 +3,7 @@
 // 不开 VPN 时这个地址打不开，cache.addAll 只要其中一个失败就整个安装失败，
 // 结果是什么都没缓存；而且它根本没缓存本地的 vue.global.prod.js / xlsx.full.min.js，
 // 也就是 app 真正用的那两个文件，断网时自然打不开。
-const CACHE_NAME = 'dibang-offline-v2';
+const CACHE_NAME = 'dibang-offline-v39';
 const CORE_FILES = [
   './',
   './index.html',
